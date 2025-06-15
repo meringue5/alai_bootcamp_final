@@ -136,19 +136,23 @@ def supervisor_node(state: MessagesState) -> Command[str]:
     last = state["messages"][-1]
     if isinstance(last, HumanMessage):
         text = last.content.strip()
-        if text.lower().startswith("업로드"):
+        lower = text.lower()
+        if lower.startswith("업로드"):
             return Command(goto="analyzer")
-        if text.lower().startswith("분석 결과 추출"):
+        if lower.startswith("분석 결과 추출") or "pdf" in lower:
             return Command(goto="report")
-        if text.lower().startswith("종료"):
+        if lower.startswith("종료"):
             return Command(goto="__end__")
-        if text.lower().startswith("질문"):
+        if lower.startswith("질문"):
             query = text.split(maxsplit=1)[-1]
             docs = vector_store.similarity_search(query)
             context = "\n".join(d.page_content for d in docs)
             prompt = f"Answer the question based on code context:\n{context}\nQuestion: {query}"
             answer = llm.invoke([HumanMessage(content=prompt)]).content
             return Command(update={"messages": [AIMessage(content=answer)]}, goto="supervisor")
+        # 업로드 명령 없이 코드가 입력된 경우 자동 분석
+        if "\n" in text or ";" in text:
+            return Command(goto="analyzer")
     return Command(goto="supervisor")
 
 
@@ -163,34 +167,3 @@ def build_graph() -> StateGraph:
     return builder.compile()
 
 
-def supervisor_node(state: MessagesState) -> Command[str]:
-    last = state["messages"][-1]
-    if isinstance(last, HumanMessage):
-        text = last.content.strip()
-        if text.lower().startswith("업로드"):
-            return Command(goto="analyzer")
-        if text.lower().startswith("분석 결과 추출"):
-            return Command(goto="report")
-        if text.lower().startswith("종료"):
-            return Command(goto="__end__")
-        if text.lower().startswith("질문"):
-            # 질문 처리 예시 (실제 로직에 맞게 수정)
-            return Command(goto="supervisor")
-    # 종료 조건에 해당하지 않으면 반드시 종료
-    return Command(goto="__end__")
-
-def analyzer_node(state: MessagesState) -> Command[str]:
-    # 분석 노드 예시 (실제 분석 로직으로 대체)
-    return Command(goto="supervisor")
-
-def report_node(state: MessagesState) -> Command[str]:
-    # 리포트 노드 예시 (실제 리포트 생성 로직으로 대체)
-    return Command(goto="supervisor")
-
-def build_graph() -> StateGraph:
-    builder = StateGraph(MessagesState)
-    builder.add_node("supervisor", supervisor_node)
-    builder.add_node("analyzer", analyzer_node)
-    builder.add_node("report", report_node)
-    builder.set_entry_point("supervisor")
-    return builder.compile()
