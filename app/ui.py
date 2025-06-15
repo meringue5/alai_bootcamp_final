@@ -1,6 +1,6 @@
 import streamlit as st
 from langchain_core.messages import HumanMessage
-from .agents import build_graph
+from app.agents import build_graph
 
 st.set_page_config(page_title="C Code Analyzer", page_icon="💻")
 
