@@ -13,7 +13,7 @@ import config
 
 from analysis import analyze_static, detect_anti_patterns
 from vector_store import VectorStore
-from reportlab.pdfgen import canvas
+#from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import A4
 import io
 import base64
