@@ -113,7 +113,9 @@ def analyzer_node(state: MessagesState) -> Command[str]:
             f"Lines: {analysis.total_lines}, Functions: {analysis.function_count}, "
             f"Variables: {analysis.variable_count}, Cyclomatic: {analysis.cyclomatic_complexity}"
         )
-        return Command(update={"messages": [AIMessage(content=msg)]}, goto="supervisor")
+        # 분석이 끝나면 안내 메시지 추가
+        ai_msg = AIMessage(content="분석이 완료되었습니다. '분석 결과 추출' 명령을 입력하면 리포트를 받을 수 있습니다.")
+        return Command(update={"messages": [ai_msg]}, goto="supervisor")
     return Command(goto="__end__")
 
 
@@ -145,12 +147,13 @@ def supervisor_node(state: MessagesState) -> Command[str]:
         if text.lower().startswith("질문"):
             # 질문 처리 예시 (실제 로직에 맞게 수정)
             return Command(goto="supervisor")
-        # 명령어가 아니면 챗봇 답변 생성
+        # 명령어가 아니면 챗봇 답변 생성 (한국어 시스템 프롬프트 적용)
         llm = AzureChatOpenAI(
             deployment_name=config.AOAI_DEPLOY_GPT4O,
             api_version=config.AOAI_API_VERSION
         )
-        response = llm([last])
+        system_prompt = AIMessage(content="모든 답변은 한국어로 해주세요. 다만 코드 관련 질문은 영어로 답변할 수 있습니다.")
+        response = llm([system_prompt, last])
         ai_msg = AIMessage(content=response.content)
         return Command(update={"messages": [ai_msg]}, goto="supervisor")
     # 종료 조건에 해당하지 않으면 반드시 종료
