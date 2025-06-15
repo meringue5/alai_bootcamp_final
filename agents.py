@@ -147,7 +147,7 @@ def supervisor_node(state: MessagesState) -> Command[str]:
             return Command(goto="supervisor")
         # 명령어가 아니면 챗봇 답변 생성
         llm = AzureChatOpenAI(
-            deployment_name="gpt-3.5-turbo",  # 실제 환경에 맞게 deployment_name 수정
+            deployment_name=config.AOAI_DEPLOY_GPT4O,
             api_version=config.AOAI_API_VERSION
         )
         response = llm([last])
