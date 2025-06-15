@@ -373,3 +373,15 @@ Supervisor Agent가 명령을 해석하여 하위 Agent를 호출하며, 전체 
 - Docker 컨테이너 패키징
 
 ---
+
+## 📌 사용 방법
+
+1. 의존성 설치
+   ```bash
+   pip install -r requirements.txt
+   ```
+2. 환경 변수 설정 (`AOAI_ENDPOINT`, `AOAI_API_KEY`, `AOAI_DEPLOY_GPT4O`, `AOAI_DEPLOY_EMBED_3_LARGE` 등)
+3. Streamlit 애플리케이션 실행
+   ```bash
+   streamlit run app/ui.py
+   ```
