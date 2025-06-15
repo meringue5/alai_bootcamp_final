@@ -13,7 +13,9 @@ import config
 
 from analysis import analyze_static, detect_anti_patterns
 from vector_store import VectorStore
-from fpdf import FPDF
+from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import A4
+import io
 import base64
 import streamlit as st
 
@@ -127,21 +129,32 @@ def analyzer_node(state: MessagesState) -> Command[str]:
 
 
 def report_node(state: MessagesState) -> Command[str]:
-    """현재까지 저장된 분석 결과를 요약합니다."""
-
+    # PDF 리포트 생성 및 다운로드 링크 제공 (reportlab 사용)
     files = state.get("uploaded_files", [])
     if not files:
         return Command(update={"messages": [AIMessage(content="분석된 파일이 없습니다.")]}, goto="supervisor")
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    pdf.cell(200, 10, txt="C 코드 분석 리포트", ln=True, align="C")
+    buffer = io.BytesIO()
+    c = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+    y = height - 40
+    c.setFont("Helvetica-Bold", 16)
+    c.drawString(100, y, "C 코드 분석 리포트")
+    c.setFont("Helvetica", 12)
+    y -= 40
     for f in files:
-        pdf.ln(10)
-        pdf.cell(200, 10, txt=f"파일명: {f['name']}", ln=True)
-        pdf.multi_cell(0, 10, f"분석 결과:\n{f.get('analysis', '분석 결과 없음')}")
-    pdf_bytes = pdf.output(dest="S").encode("latin1")
-    b64 = base64.b64encode(pdf_bytes).decode()
+        c.drawString(50, y, f"파일명: {f['name']}")
+        y -= 20
+        for line in f.get('analysis', '분석 결과 없음').splitlines():
+            c.drawString(60, y, line)
+            y -= 15
+            if y < 50:
+                c.showPage()
+                y = height - 40
+                c.setFont("Helvetica", 12)
+        y -= 20
+    c.save()
+    buffer.seek(0)
+    b64 = base64.b64encode(buffer.read()).decode()
     href = f'<a href="data:application/pdf;base64,{b64}" download="report.pdf">PDF 리포트 다운로드</a>'
     ai_msg = AIMessage(content=f"분석 리포트가 생성되었습니다. 아래 링크를 클릭해 PDF를 다운로드하세요.\n{href}")
     return Command(update={"messages": [ai_msg]}, goto="supervisor")

@@ -9,4 +9,4 @@ typing_extensions
 streamlit
 langchain-community
 faiss-cpu
-fpdf
+reportlab
