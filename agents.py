@@ -146,7 +146,10 @@ def supervisor_node(state: MessagesState) -> Command[str]:
             # 질문 처리 예시 (실제 로직에 맞게 수정)
             return Command(goto="supervisor")
         # 명령어가 아니면 챗봇 답변 생성
-        llm = AzureChatOpenAI(deployment_name="gpt-3.5-turbo")  # 실제 환경에 맞게 deployment_name 수정
+        llm = AzureChatOpenAI(
+            deployment_name="gpt-3.5-turbo",  # 실제 환경에 맞게 deployment_name 수정
+            api_version=config.AOAI_API_VERSION
+        )
         response = llm([last])
         ai_msg = AIMessage(content=response.content)
         return Command(update={"messages": [ai_msg]}, goto="supervisor")
