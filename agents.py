@@ -13,6 +13,9 @@ import config
 
 from analysis import analyze_static, detect_anti_patterns
 from vector_store import VectorStore
+from fpdf import FPDF
+import base64
+import streamlit as st
 
 @dataclass
 class Agent:
@@ -96,68 +99,74 @@ llm = get_llm()
 
 
 def analyzer_node(state: MessagesState) -> Command[str]:
-    """업로드된 코드를 분석하여 결과를 저장합니다."""
-
+    """
+    업로드된 코드를 분석하고, 분석 결과를 st.session_state.uploaded_files에 저장합니다.
+    """
     last = state["messages"][-1]
-    if isinstance(last, HumanMessage) and last.content:
+    if isinstance(last, HumanMessage):
         code = last.content
+        # 분석 수행
         analysis = analyze_static(code)
         anti = detect_anti_patterns(code)
-        mem.analyses.append({
-            "analysis": analysis,
-            "anti_patterns": anti,
-            "code": code,
-        })
-        vector_store.add_documents([code])
-        msg = (
-            f"Lines: {analysis.total_lines}, Functions: {analysis.function_count}, "
-            f"Variables: {analysis.variable_count}, Cyclomatic: {analysis.cyclomatic_complexity}"
-        )
-        # 분석이 끝나면 안내 메시지 추가
-        ai_msg = AIMessage(content="분석이 완료되었습니다. '분석 결과 추출' 명령을 입력하면 리포트를 받을 수 있습니다.")
+        # 분석 결과 문자열 생성 (한국어)
+        analysis_str = f"총 라인 수: {analysis.total_lines}\n함수 개수: {analysis.function_count}\n변수 개수: {analysis.variable_count}\n순환 복잡도: {analysis.cyclomatic_complexity}\n사유: {analysis.complexity_reasoning}"
+        if anti:
+            analysis_str += "\n안티패턴:\n" + "\n".join(f"- {a.type}: {a.details}" for a in anti)
+        # 업로드 파일 목록(state["uploaded_files"])에 분석 결과 저장
+        found = False
+        for f in state["uploaded_files"]:
+            if f["code"] == code:
+                f["analysis"] = analysis_str
+                found = True
+        if not found:
+            state["uploaded_files"].append({"name": "업로드파일", "code": code, "analysis": analysis_str})
+        # 안내 메시지
+        ai_msg = AIMessage(content="분석이 완료되었습니다. '분석 결과 추출' 명령을 입력하면 PDF 리포트를 다운로드할 수 있습니다.")
         return Command(update={"messages": [ai_msg]}, goto="supervisor")
-    return Command(goto="__end__")
+    return Command(goto="supervisor")
 
 
 def report_node(state: MessagesState) -> Command[str]:
     """현재까지 저장된 분석 결과를 요약합니다."""
 
-    report_lines = []
-    for i, entry in enumerate(mem.analyses):
-        a = entry["analysis"]
-        report_lines.append(
-            f"File {i+1}: lines={a.total_lines} functions={a.function_count} variables={a.variable_count} complexity={a.cyclomatic_complexity}"
-        )
-    report = "\n".join(report_lines) or "No analysis yet"
-    return Command(update={"messages": [AIMessage(content=report)]}, goto="supervisor")
+    files = state.get("uploaded_files", [])
+    if not files:
+        return Command(update={"messages": [AIMessage(content="분석된 파일이 없습니다.")]}, goto="supervisor")
+    pdf = FPDF()
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    pdf.cell(200, 10, txt="C 코드 분석 리포트", ln=True, align="C")
+    for f in files:
+        pdf.ln(10)
+        pdf.cell(200, 10, txt=f"파일명: {f['name']}", ln=True)
+        pdf.multi_cell(0, 10, f"분석 결과:\n{f.get('analysis', '분석 결과 없음')}")
+    pdf_bytes = pdf.output(dest="S").encode("latin1")
+    b64 = base64.b64encode(pdf_bytes).decode()
+    href = f'<a href="data:application/pdf;base64,{b64}" download="report.pdf">PDF 리포트 다운로드</a>'
+    ai_msg = AIMessage(content=f"분석 리포트가 생성되었습니다. 아래 링크를 클릭해 PDF를 다운로드하세요.\n{href}")
+    return Command(update={"messages": [ai_msg]}, goto="supervisor")
 
 
 def supervisor_node(state: MessagesState) -> Command[str]:
     """사용자 명령을 해석하여 다음 노드를 결정합니다."""
 
+    # 업로드 파일 목록을 state에 저장/기억
+    if "uploaded_files" not in state:
+        state["uploaded_files"] = []
     last = state["messages"][-1]
     if isinstance(last, HumanMessage):
         text = last.content.strip()
-        if text.lower().startswith("업로드"):
+        if text.lower().startswith("업로드") or text.lower().startswith("분석"):
             return Command(goto="analyzer")
         if text.lower().startswith("분석 결과 추출"):
             return Command(goto="report")
         if text.lower().startswith("종료"):
             return Command(goto="__end__")
         if text.lower().startswith("질문"):
-            # 질문 처리 예시 (실제 로직에 맞게 수정)
             return Command(goto="supervisor")
-        # 명령어가 아니면 챗봇 답변 생성 (한국어 시스템 프롬프트 적용)
-        llm = AzureChatOpenAI(
-            deployment_name=config.AOAI_DEPLOY_GPT4O,
-            api_version=config.AOAI_API_VERSION
-        )
-        system_prompt = AIMessage(content="모든 답변은 한국어로 해주세요. 다만 코드 관련 질문은 영어로 답변할 수 있습니다.")
-        response = llm([system_prompt, last])
-        ai_msg = AIMessage(content=response.content)
-        return Command(update={"messages": [ai_msg]}, goto="supervisor")
-    # 종료 조건에 해당하지 않으면 반드시 종료
+        # 일반 대화 처리 (생략)
     return Command(goto="__end__")
+
 
 def build_graph() -> StateGraph:
     """에이전트 노드를 연결한 그래프를 생성합니다."""
