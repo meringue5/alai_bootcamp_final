@@ -342,8 +342,9 @@ Supervisor Agent가 명령을 해석하여 하위 Agent를 호출하며, 전체 
 
 - 파일 업로드 기능
 - 소스코드 목록 표시
-- 명령어 입력 인터페이스 (커맨드 기반)
-- 분석 결과 PDF 다운로드 제공
+ - 대화형 챗봇 인터페이스
+ - 업로드한 파일은 자동으로 분석
+ - 분석 결과 PDF 다운로드 제공
 
 ---
 
@@ -383,5 +384,5 @@ Supervisor Agent가 명령을 해석하여 하위 Agent를 호출하며, 전체 
 2. 환경 변수 설정 (`AOAI_ENDPOINT`, `AOAI_API_KEY`, `AOAI_DEPLOY_GPT4O`, `AOAI_DEPLOY_EMBED_3_LARGE` 등)
 3. Streamlit 애플리케이션 실행
    ```bash
-   streamlit run app/ui.py
+   streamlit run main.py
    ```
