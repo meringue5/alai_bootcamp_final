@@ -1,7 +1,8 @@
+# 임베딩 모델 관련 함수 정의
 from langchain_openai import AzureOpenAIEmbeddings
-from . import config
+import config
 
-
+# Azure OpenAI 임베딩 모델을 반환합니다.
 def get_embedding_model() -> AzureOpenAIEmbeddings:
     return AzureOpenAIEmbeddings(
         azure_endpoint=config.AOAI_ENDPOINT,

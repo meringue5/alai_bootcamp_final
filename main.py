@@ -1,7 +1,9 @@
+# Streamlit 기반 C 코드 분석기 메인 엔트리포인트
 import streamlit as st
 from langchain_core.messages import HumanMessage
-from app.agents import build_graph
+from agents import build_graph
 
+# Streamlit 앱 설정 및 UI 구성
 st.set_page_config(page_title="C Code Analyzer", page_icon="💻")
 
 st.title("💻 C Code Analyzer")
