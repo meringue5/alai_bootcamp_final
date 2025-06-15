@@ -6,3 +6,6 @@ langgraph==0.3.5
 langsmith==0.3.11
 requests==2.32.4
 typing_extensions==4.13.2
+streamlit==1.45.1
+langchain-community==0.0.28
+faiss-cpu==1.7.4

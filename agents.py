@@ -9,6 +9,8 @@ from langgraph.types import Command
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_openai import AzureChatOpenAI
 
+import config
+
 from analysis import analyze_static, detect_anti_patterns
 from vector_store import VectorStore
 
@@ -65,3 +67,98 @@ class Agent:
     def _example_tool(self, *args, **kwargs):
         """도구 구현 예시입니다."""
         # ...구현부...
+
+
+# --- 간단한 그래프 빌더 구현 ---
+
+@dataclass
+class Memory:
+    """분석 결과를 저장하기 위한 메모리"""
+
+    analyses: List[Dict] = field(default_factory=list)
+
+
+def get_llm() -> AzureChatOpenAI:
+    """Azure OpenAI LLM 인스턴스를 반환합니다."""
+
+    return AzureChatOpenAI(
+        azure_endpoint=config.AOAI_ENDPOINT,
+        api_key=config.AOAI_API_KEY,
+        azure_deployment=config.AOAI_DEPLOY_GPT4O,
+        api_version=config.AOAI_API_VERSION,
+        temperature=0.0,
+    )
+
+
+vector_store = VectorStore()
+mem = Memory()
+llm = get_llm()
+
+
+def analyzer_node(state: MessagesState) -> Command[str]:
+    """업로드된 코드를 분석하여 결과를 저장합니다."""
+
+    last = state["messages"][-1]
+    if isinstance(last, HumanMessage) and last.content:
+        code = last.content
+        analysis = analyze_static(code)
+        anti = detect_anti_patterns(code)
+        mem.analyses.append({
+            "analysis": analysis,
+            "anti_patterns": anti,
+            "code": code,
+        })
+        vector_store.add_documents([code])
+        msg = (
+            f"Lines: {analysis.total_lines}, Functions: {analysis.function_count}, "
+            f"Variables: {analysis.variable_count}, Cyclomatic: {analysis.cyclomatic_complexity}"
+        )
+        return Command(update={"messages": [AIMessage(content=msg)]}, goto="supervisor")
+    return Command(goto="supervisor")
+
+
+def report_node(state: MessagesState) -> Command[str]:
+    """현재까지 저장된 분석 결과를 요약합니다."""
+
+    report_lines = []
+    for i, entry in enumerate(mem.analyses):
+        a = entry["analysis"]
+        report_lines.append(
+            f"File {i+1}: lines={a.total_lines} functions={a.function_count} variables={a.variable_count} complexity={a.cyclomatic_complexity}"
+        )
+    report = "\n".join(report_lines) or "No analysis yet"
+    return Command(update={"messages": [AIMessage(content=report)]}, goto="supervisor")
+
+
+def supervisor_node(state: MessagesState) -> Command[str]:
+    """사용자 명령을 해석하여 다음 노드를 결정합니다."""
+
+    last = state["messages"][-1]
+    if isinstance(last, HumanMessage):
+        text = last.content.strip()
+        if text.lower().startswith("업로드"):
+            return Command(goto="analyzer")
+        if text.lower().startswith("분석 결과 추출"):
+            return Command(goto="report")
+        if text.lower().startswith("종료"):
+            return Command(goto="__end__")
+        if text.lower().startswith("질문"):
+            query = text.split(maxsplit=1)[-1]
+            docs = vector_store.similarity_search(query)
+            context = "\n".join(d.page_content for d in docs)
+            prompt = f"Answer the question based on code context:\n{context}\nQuestion: {query}"
+            answer = llm.invoke([HumanMessage(content=prompt)]).content
+            return Command(update={"messages": [AIMessage(content=answer)]}, goto="supervisor")
+    return Command(goto="supervisor")
+
+
+def build_graph() -> StateGraph:
+    """에이전트 노드를 연결한 그래프를 생성합니다."""
+
+    builder = StateGraph(MessagesState)
+    builder.add_node("supervisor", supervisor_node)
+    builder.add_node("analyzer", analyzer_node)
+    builder.add_node("report", report_node)
+    builder.set_entry_point("supervisor")
+    return builder.compile()
+
