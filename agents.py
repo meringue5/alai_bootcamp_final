@@ -10,8 +10,7 @@ from langchain_core.messages import HumanMessage, AIMessage
 from langchain_openai import AzureChatOpenAI
 
 from analysis import analyze_static, detect_anti_patterns
-from vector_store import CodeVectorStore
-import config
+from vector_store import VectorStore
 
 @dataclass
 class Agent:
@@ -51,7 +50,7 @@ class Agent:
 
     def search_codebase(self, query: str) -> List[str]:
         """벡터스토어를 사용해 코드베이스를 검색합니다."""
-        vector_store = CodeVectorStore()
+        vector_store = VectorStore()
         results = vector_store.similarity_search(query)
         return results
 
