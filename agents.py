@@ -163,7 +163,11 @@ def supervisor_node(state: MessagesState) -> Command[str]:
             return Command(goto="__end__")
         if text.lower().startswith("질문"):
             return Command(goto="supervisor")
-        # 일반 대화 처리 (생략)
+        # 일반 대화 처리: LLM 답변 생성
+        system_prompt = AIMessage(content="모든 답변은 한국어로 해주세요. 다만 코드 관련 질문은 영어로 답변할 수 있습니다.")
+        response = llm([system_prompt, last])
+        ai_msg = AIMessage(content=response.content)
+        return Command(update={"messages": [ai_msg]}, goto="supervisor")
     return Command(goto="__end__")
 
 
