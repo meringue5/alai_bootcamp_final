@@ -25,11 +25,11 @@ if uploaded_file is not None and st.session_state.uploaded_name != uploaded_file
     st.session_state.messages.append(HumanMessage(content=code))
     result = st.session_state.graph.invoke({"messages": st.session_state.messages})
     st.session_state.messages = result["messages"]
-    st.experimental_rerun()
+    st.rerun()
 
 if prompt := st.chat_input("메시지를 입력하세요"):
     sanitized = prompt.encode("utf-8", "replace").decode("utf-8", "replace")
     st.session_state.messages.append(HumanMessage(content=sanitized))
     result = st.session_state.graph.invoke({"messages": st.session_state.messages})
     st.session_state.messages = result["messages"]
-    st.experimental_rerun()
+    st.rerun()
