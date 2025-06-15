@@ -114,7 +114,7 @@ def analyzer_node(state: MessagesState) -> Command[str]:
             f"Variables: {analysis.variable_count}, Cyclomatic: {analysis.cyclomatic_complexity}"
         )
         return Command(update={"messages": [AIMessage(content=msg)]}, goto="supervisor")
-    return Command(goto="supervisor")
+    return Command(goto="__end__")
 
 
 def report_node(state: MessagesState) -> Command[str]:
@@ -153,8 +153,7 @@ def supervisor_node(state: MessagesState) -> Command[str]:
         # 업로드 명령 없이 코드가 입력된 경우 자동 분석
         if "\n" in text or ";" in text:
             return Command(goto="analyzer")
-    return Command(goto="supervisor")
-
+    return Command(goto="__end__")
 
 def build_graph() -> StateGraph:
     """에이전트 노드를 연결한 그래프를 생성합니다."""
